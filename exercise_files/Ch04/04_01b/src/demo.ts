@@ -26,7 +26,7 @@ interface Query {
     matches(val): boolean;
 }
 
-type ContactQuery = Record<keyof Contact, Query>
+type ContactQuery = Partial<Record<keyof Contact, Query>>
 
 function searchContacts(contacts: Contact[], query: ContactQuery) {
     return contacts.filter(contact => {

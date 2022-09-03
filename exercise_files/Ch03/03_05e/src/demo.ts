@@ -40,11 +40,7 @@ function searchContacts(contacts: Contact[], query: Record<keyof Contact, Query>
         return false;
     })
 }
+type ContactQuery = Pick<Partial<Record<keyof Contact, Query>>, 'id' | 'name'>
 
-const filteredContacts = searchContacts(
-    [/* contacts */],
-    {
-        id: { matches: (id) => id === 123 },
-        name: { matches: (name) => name === "Carol Weaver" },
-    }
-);
+
+type ContactQuery2 = Partial<Pick<Record<keyof Contact, Query>, 'id' | 'name'>>

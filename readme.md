@@ -296,3 +296,362 @@ Challenge solution:
     const newTodo = addTodoItem("Buy lots of stuff with all the money we make from the app")
     
     console.log(JSON.stringify(newTodo))
+
+## Defining more complex types
+
+### Combining multiple types with union types
+
+    interface Contact {
+      id: number;
+      name: string;
+      birthdate?: Date | number | string; // can accept any of these 
+    }
+
+To use union types, the actual type must be checked / asserted in the code.
+
+    function getBirthDate(contact: Contact) {
+        if (typeof contact.birthDate === "number") {
+            return new Date(contact.birthDate);
+        }
+        else if (typeof contact.birthDate === "string") {
+            return Date.parse(contact.birthDate)
+        }
+        else {
+            return contact.birthDate
+        }
+    }
+
+Type aliases can be used:
+
+    type ContactBirthDate = Date | number | string;
+
+    interface Contact {
+      id: number;
+      name: string;
+      birthdate?: ContactBirthDate 
+    }
+
+Interfaces can be combined to a new interface:
+
+    interface AddressableContact extends Contact, Address {};
+
+or a new type using `&`:
+
+    type AddressableCcontent = Contact & Address;
+
+Union type aliases can be also used as a (arguably better) alternative to enum types and still provide full code completion and type checks:
+
+    type Status = 'done' | 'in-progredd' | 'todo'
+
+
+### Keyof operator
+
+> The keyof operator takes an object type and produces a string or numeric literal union of its keys. The following type P is the same type as “x” | “y”:
+
+    type Point = { x: number; y: number };
+    type P = keyof Point;
+
+From https://www.typescriptlang.org/docs/handbook/2/keyof-types.html
+
+    type ContactFields = keyof Contact;
+    // ContactFields = "id" | "name" | "contact"
+
+Real world example:
+
+    // ensure the given property exists in Contact
+    function getValue(source: Contact, propertyName: keyof Contact) {
+      return source[propertyName];
+    }
+
+Even better with generics to make the function useful for any type of object:
+
+    function getValue<T>(source: T, propertyName: keyof T) {
+      return source[propertyName];
+    }
+
+Using generics, we can either give the type explicitly on function call:
+
+    const name = getValue<Contact>(myContact, 'name');
+
+or let typescript *infer* the type:
+
+    const value = getValue({min: 0, max: 10}, 'max'); // 'min'/'max' is autocompleted / typechecked
+
+We can also introduce a second generic type for the `propertyName` so it can be referenced inside the function:
+
+    function getValue<T, U extends keyof T>(source: T, propertyName: U) {
+      return source[propertyName];
+    }
+
+### Typeof operator
+
+`typeof` is a native javascript operator:
+
+    typeof "hey"; // 'string'
+    typeof myContact; // 'object'
+
+This can be used to assert types so typescript can narrow down / infer the type of a union type:
+
+    function toContact(nameOrContact: string | Contact): Contact {
+        if (typeof nameOrContact === "object") {
+            // ts now knows that it must be a Contact
+            return {
+                id: nameOrContact.id,
+                name: nameOrContact.name,
+                status: nameOrContact.status
+            }
+        }
+        else {
+            // ts now knows that it must be a string
+            return {
+                id: 0,
+                name: nameOrContact,
+                status: "active"
+            }
+        }
+    }
+
+`typeof` can be used to create explicit types from a given object:
+
+    const myType = { min: 1, max: 200 }
+    
+    function save(source: typeof myType) {...}
+
+or explicitely named:
+
+    type MinMax = typeof myType;
+    // same as type MinMax = {min: number, max: number}
+
+### Indexed access types
+
+Indexed types can be use to make a property type match the type of a property in another type / interface; it uses the same syntax as accessing an object property using `[]`.
+
+    interface Contact {
+      id: number;
+      // ...
+    }
+    
+    interface ContactEvent {
+      contactId: Contact["id"]; // same as contactId: number
+    }
+
+
+That way, when changing the `id` type to number, it needs to be changed in only one place (the same could be done if we defined a type alias for the id and used that everywhere).
+
+Multiple levels are ok too (e.g. Contact["Address"]["Street"])
+
+Usage with generics (see `handleEvent` function at the bottom):
+
+    interface ContactEvent {
+        contactId: Contact["id"];
+    }
+    
+    interface ContactDeletedEvent extends ContactEvent {
+    }
+    
+    interface ContactStatusChangedEvent extends ContactEvent {
+        oldStatus: Contact["status"];
+        newStatus: Contact["status"];
+    }
+    
+    interface ContactEvents {
+        deleted: ContactDeletedEvent;
+        statusChanged: ContactStatusChangedEvent;
+        // ... and so on
+    }
+    
+    function getValue<T, U extends keyof T>(source: T, propertyName: U) {
+        return source[propertyName];
+    }
+    
+    function handleEvent<T extends keyof ContactEvents>(
+        eventName: T,
+        handler: (evt: ContactEvents[T]) => void
+    ) {
+        if (eventName === "statusChanged") {
+            handler({ contactId: 1, oldStatus: "active", newStatus: "inactive" })
+        }
+    }
+
+    handleEvent("statusChanged", evt => evt) // evt is automatically infered as ContactStatusChangedEvent
+
+### Defining dynamic but limited types with records
+
+As using `any` essentially means opting out of typechecking (bad), records can be a more type-safe alternative for describing flexible object types.
+
+Before, using any:
+  
+    let x: any = { name: "blah" }
+    x.mynum = 1234; // no error
+    x = () => console.log("hi"); // no error
+
+Using `Record`:
+
+    let x: Record<string, string | number> = { name: "blah" } // fine, key and value are string
+    x.mynum = 1234;
+    x.flag = true; // error, neither string nor number.
+    x = 1234; // error, not a record / object
+
+Usage to implement a search:
+
+    type ContactStatus = "active" | "inactive" | "new";
+    
+    interface Address {
+        street: string;
+        province: string;
+        postalCode: string;
+    }
+    
+    interface Contact {
+        id: number;
+        name: string;
+        status: ContactStatus;
+        address: Address;
+    }
+    
+    interface Query {
+        sort?: 'asc' | 'desc';
+        matches(val): boolean;
+    }
+    
+    function searchContacts(contacts: Contact[], query: Record<keyof Contact, Query>) {
+        return contacts.filter(contact => {
+            for (const property of Object.keys(contact) as (keyof Contact)[]) {
+                // get the query object for this property
+                const propertyQuery = query[property];
+                // check to see if it matches
+                if (propertyQuery && propertyQuery.matches(contact[property])) {
+                    return true;
+                }
+            }
+    
+            return false;
+        })
+    }
+
+    const filteredContacts = searchContacts(
+        [/* contacts */],
+        // typescript will complain here because it expects ALL properties
+        // of Contact to be defined in the object
+        {
+            id: { matches: (id) => id === 123 },
+            name: { matches: (name) => name === "Carol Weaver" },
+        }
+    );
+
+## Extending and extracting metadata from existing types
+
+### Extending and modifying existing types
+
+`Partial` is a generic type that makes all properties of a given type optional. With it, we can solve the problem above:
+
+    function searchContacts(contacts: Contact[], query: Partial<Record<keyof Contact, Query>>)
+
+If we want to *restrict* which properties we can use, e.g. we don't want the `address` and `status` field to be definable as a search object property, we can use `Omit` which takes a type and a list of the properties to omit (remove) from the type:
+
+    type ContactQuery = Omit<Partial<Record<keyof Contact, Query>>, 'address' | 'status'>;
+
+    function searchContacts(contacts: Contact[], 
+                            query: ContactQuery)
+
+the `query` parameter would now be
+
+    type ContactQuery = {
+      id?: Query;
+      name?: Query;
+    }
+
+If we added another field to the `Contact` type, the resulting `ContactQuery` would include that type. If we only want specific properties to be included, we can explicitly name them using `Pick` (the "opposite" of `Omit`:
+
+    type ContactQuery = Pick<Partial<Record<keyof Contact, Query>>, 'id' | 'name'>
+
+or (same as) 
+
+    type ContactQuery = Partial<Pick<Record<keyof Contact, Query>, 'id' | 'name'>>
+
+To make all properties required, we can use `Required`:
+
+    type RequiredContactQuery = Required<ContactQuery>
+    
+    // =  
+    type ContactQuery = {
+      id: Query;
+      name: Query;
+    }
+
+### Extracting metadata from existing types / Map types
+
+A Map type from an existing type:
+
+    type ContactQuery = {
+      [TProp in keyof Contact]? Query
+    }
+
+resulting in 
+
+    type ContactQuery = {
+      id?: Query;
+      name?: Query;
+      status?: Query;
+      address?: Query;
+    }
+
+which is the same as `Partial<Record<keyof Contact, Query>>`.
+
+Map types makes the definition complex types more readable. 
+
+Here we want to change
+
+    interface Query {
+        sort?: 'asc' | 'desc';
+        matches(val): boolean; // val is untyped, same as (val: any) => boolean
+    }
+
+so that `val` is properly typed by making it generic.
+
+    interface Query<TProp> {
+      sort?: 'asc' | 'desc';
+      matches(val: TProp): boolean;
+    }
+
+and use it like this in `ContactQuery`:
+
+    type ContactQuery = {
+      [TProp in keyof Contact]? Query<Contact[TProp]>
+    }
+
+resulting in 
+
+    type ContactQuery = {
+      id?: Query<number>;
+      name?: Query<string>;
+      status?: Query<ContactStatus>;
+      address?: Query<Address>;
+    }
+
+so that all properties are correctly typed.
+
+To make `searchContacts` not complain about unpredictable types, we must change
+
+    const propertyQuery = query[property];
+
+to 
+
+    const propertyQuery = query[property] as Query<Contact[keyof Contact]>;
+
+Full function: 
+
+    function searchContacts(contacts: Contact[], query: ContactQuery) {
+        return contacts.filter(contact => {
+            for (const property of Object.keys(contact) as (keyof Contact)[]) {
+                const propertyQuery = query[property] as Query<Contact[keyof Contact]>;
+                if (propertyQuery && propertyQuery.matches(contact[property])) {
+                    return true;
+                }
+            }
+    
+            return false;
+        })
+    }
+
+While complicated at first, it's one of the most useful ways to avoid using `any`.
