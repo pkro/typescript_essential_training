@@ -655,3 +655,49 @@ Full function:
     }
 
 While complicated at first, it's one of the most useful ways to avoid using `any`.
+
+Challenge:
+
+    function query<T>(
+        items: T[],
+        query: any  // <--- replace this!
+    ) {
+        return items.filter(item => {
+            // iterate through each of the item's properties
+            for (const property of Object.keys(item)) {
+    
+                // get the query for this property name
+                const propertyQuery = query[property]
+    
+                // see if this property value matches the query
+                if (propertyQuery && propertyQuery(item[property])) {
+                    return true
+                }
+            }
+    
+            // nothing matched so return false
+            return false
+        })
+    }
+    
+    const matches = query(
+        [
+            { name: "Ted", age: 12 },
+            { name: "Angie", age: 31 }
+        ],
+        {
+            name: name => name === "Angie",
+            age: age => age > 30
+        })
+
+Own solution:
+
+    query: Record<keyof T, (arg: T[keyof T]) => boolean>
+
+Solution 1: same as own; problem: arg can be `number | string` for any of the object properties, which is not true.
+
+Solution 2 (`?` makes any property optional and TProp makes it so it matches only the real type of the given property *I don't really get how this works*):
+
+    query: {
+      [TProp in keyof T]?: (val: T[TProp]) => boolean
+    }

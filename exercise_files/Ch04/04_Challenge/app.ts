@@ -1,6 +1,6 @@
 function query<T>(
     items: T[],
-    query: any // <--- replace this!
+    query: Record<keyof T, (arg: T[keyof T]) => boolean>  // <--- replace this!
 ) {
     return items.filter(item => {
         // iterate through each of the item's properties
