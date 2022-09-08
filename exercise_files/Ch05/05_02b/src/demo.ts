@@ -13,6 +13,20 @@ const currentUser = {
     }
 }
 
+function authorize(target: any, property: string, descriptor: PropertyDescriptor) {
+    // copy current method
+    const wrapped = descriptor.value;
+
+    descriptor.value = function () {
+        // additional behavior
+        if(!currentUser.isAuthenticated()) {
+            throw Error("Not authorized");
+        }
+        // execute the method as it was
+        return wrapped.apply(this, arguments);
+    }
+}
+
 class ContactRepository {
     private contacts: Contact[] = [];
 

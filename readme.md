@@ -701,3 +701,279 @@ Solution 2 (`?` makes any property optional and TProp makes it so it matches onl
     query: {
       [TProp in keyof T]?: (val: T[TProp]) => boolean
     }
+
+## Decorators
+
+Metadata that can be added to classes, functions etc adding behavior to code.
+
+The following class has logging and authorization checks inside the code of its methods, which shouldn't be the methods primary concern and is also duplicating code for it.
+
+    interface Contact {
+        id: number;
+    }
+    
+    const currentUser = {
+        id: 1234,
+        roles: ["ContactEditor"],
+        isInRole(role: string): boolean {
+            return this.roles.contains(role);
+        }
+    }
+    
+    class ContactRepository {
+        private contacts: Contact[] = [];
+    
+        getContactById(id: number): Contact | null {
+            // logging
+            console.trace(`ContactRepository.getContactById: BEGIN`);
+            // auth check
+            if (!currentUser.isInRole("ContactViewer")) {
+                throw Error("User not authorized to execute this action");
+            }
+            // actual logic
+            const contact = this.contacts.find(x => x.id === id);
+            // logging
+            console.debug(`ContactRepository.getContactById: END`);
+    
+            return contact;
+        }
+    
+        save(contact: Contact): void {
+            console.trace(`ContactRepository.save: BEGIN`);
+    
+            if (!currentUser.isInRole("ContactEditor")) {
+                throw Error("User not authorized to execute this action");
+            }
+    
+            const existing = this.getContactById(contact.id);
+    
+            if (existing) {
+                Object.assign(existing, contact);
+            } else {
+                this.contacts.push(contact);
+            }
+    
+            console.debug(`ContactRepository.save: END`);
+        }
+    }
+
+With decorators, this could be reduced to something like
+
+    // ...
+    @log // class decorator
+    class ContactRepository {
+        private contacts: Contact[] = [];
+        
+        @authorize("ContactViewer") // method decorator
+        getContactById(id: number): Contact | null {
+            const contact = this.contacts.find(x => x.id === id);
+            return contact;
+        }
+    
+        @authorize("ContactEditor")
+        save(contact: Contact): void {
+            const existing = this.getContactById(contact.id);
+    
+            if (existing) {
+                Object.assign(existing, contact);
+            } else {
+                this.contacts.push(contact);
+            }
+        }
+    }
+
+Decorators must be explicitely enabled in typescript and are also proposed for vanilla javascript, so once it's implemented in plain JS, it might conflict with the typescript decorator syntax and thus add some technical debt.
+
+Enabling decorators (and *optionally* `emitDecoratorMetadata`) in `tsconfig.json`:
+
+    {
+        "compilerOptions": {
+            // ...
+            "experimentalDecorators": true,
+            "emitDecoratorMetadata": true,
+        },
+    
+        // ...
+    }
+
+Installing `reflect-metadata`:
+
+    npm i reflect-metadata --save
+
+`reflect-metadata` adds polyfills for proposed ECMAScript features.
+
+### Method decorators
+
+    function authorize(target: any, // the object the decorator is being applied to (the instance of the object that the method belongs to)
+                       property: string, // name of the property
+                       descriptor: PropertyDescriptor // object containing the current metadata about the property
+    ) {
+    
+    }
+
+Arguments:
+
+- `target`: the object the decorator is being applied to (the instance of the object that the method belongs to)
+- property: string, // name of the property (method name (?))
+- descriptor: PropertyDescriptor // descriptor object containing the current metadata about the property, which has always the following form (ctrl-click on `PropertyDescriptor` for the following definition):
+
+
+    interface PropertyDescriptor {
+      configurable?: boolean;
+      enumerable?: boolean;
+      value?: any;
+      writable?: boolean;
+      get?(): any;
+      set?(v: any): void;
+    }
+
+The `value?` property is the most interesting one if the property is a method as its value is the function that is executed when the function is called.
+
+2 Options to change / enhance the behavior of the method in the decorator function:
+
+Edit in place: 
+
+    descriptor.value = function () {
+      //...
+    }
+
+Return a new descriptor object which typescript uses to replace the current `PropertyDescriptor`:
+
+    return {
+      // ...
+    } as PropertyDescriptor
+
+No method is inherently better.
+
+Decorator (not yet with the role parameter we use in the example):
+
+    function authorize(target: any, property: string, descriptor: PropertyDescriptor) {
+      // copy current method
+      const wrapped = descriptor.value;
+  
+      descriptor.value = function () {
+          // additional behavior
+          if(!currentUser.isAuthenticated()) {
+              throw Error("Not authorized");
+          }
+          // execute the method as it was
+          return wrapped.apply(this, arguments);
+      }
+    }
+
+Parameters can be passed to decorators by creating decorator factories that receive the parameters and returns a decorator that has access to these additional parameters via closures (meaning they simply have access to the variable scope they were created in):
+
+    function authorize(role: string) {
+        return function authorizeDecorator(target: any, property: string, descriptor: PropertyDescriptor) {
+            const wrapped = descriptor.value
+    
+            descriptor.value = function () {
+                if (!currentUser.isAuthenticated()) {
+                    throw Error("User is not authenticated");
+                }
+                if (!currentUser.isInRole(role)) {
+                    throw Error("User not authorized to execute this action");
+                }
+                
+                return wrapped.apply(this, arguments);
+            }
+        }
+    }
+    
+    class ContactRepository {
+        private contacts: Contact[] = [];
+    
+        @authorize("ContactViewer")
+        getContactById(id: number): Contact | null {
+            return  this.contacts.find(x => x.id === id);
+        }
+    
+        @authorize("ContactEditor")
+        save(contact: Contact): void {
+            const existing = this.getContactById(contact.id);
+    
+            if (existing) {
+                Object.assign(existing, contact);
+            } else {
+                this.contacts.push(contact);
+            }
+        }
+    }
+
+### Class decorators
+
+Syntax is the same as function decorators:
+
+    @freeze
+    class ContactRepository {/*...*/}
+
+The target of the decorator is not the instantiated object but the classes constructor function, so one can think about it as actually being this:
+
+    class ContactRepository {
+      @freeze
+      constructor() {/*...*/}
+      //...
+    }
+
+Example:
+
+    function freeze(constructor: Function) {
+        Object.freeze(constructor);
+        Object.freeze(constructor.prototype);
+    }
+    
+    @freeze
+    class ContactRepository {
+      // ...
+
+
+Modifying the constructor function is a rare usecase, most often class decorators are used to add functionality to classes:
+
+    // can't use  a function type so we convert it to a class type
+    // as far as I understand
+    // basically: just use this type for class decorators
+    function singleton<T extends { new(...args: any[]): {}}>(constructor: T) {
+      return class Singleton extends constructor {
+          static _instance = null;
+          constructor(...args) {
+              super(...args);
+              if (!Singleton._instance) {
+                  Singleton._instance = new Singleton();
+              }
+              return Singleton._instance;
+          }
+      }
+    }
+
+Decorators can be stacked:
+
+    @freeze
+    @singleton
+    class ContactRepository {
+
+### Creating a property decorator
+
+    function auditable(target: object, key: string | symbol) {
+        // save initial value
+        let val = target[key];
+    
+        // overwrite property with custom getter / setter
+        Object.defineProperty(target, key, {
+            get: () => val,
+            set: (newVal) => {
+                console.log(`${key.toString()} changed to ${newVal}`);
+                val = newVal;
+            },
+            enumerable: true,
+            configurable: true,
+        })
+    }
+
+    class ContactRepository {
+      @auditable
+      private contacts: Contact[] = [];
+      // ...
+
+
+
+## Working with modules

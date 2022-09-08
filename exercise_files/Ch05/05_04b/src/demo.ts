@@ -30,6 +30,24 @@ function authorize(role: string) {
     }
 }
 
+function freeze(constructor: Function) {
+    Object.freeze(constructor);
+    Object.freeze(constructor.prototype);
+}
+
+function singleton<T extends { new(...args: any[]): {}}>(constructor: T) {
+    return class Singleton extends constructor {
+        static _instance = null;
+        constructor(...args) {
+            super(...args);
+            if (!Singleton._instance) {
+                Singleton._instance = new Singleton();
+            }
+            return Singleton._instance;
+        }
+    }
+}
+
 class ContactRepository {
     private contacts: Contact[] = [];
 
