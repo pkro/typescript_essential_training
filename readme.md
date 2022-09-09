@@ -139,6 +139,18 @@ Creating a *type* from 2 interfaces:
 
     type IFooBar = IFoo & IBar;
 
+### Type definition files
+
+> TypeScript has two main kinds of files. .ts files are implementation files that contain types and executable code. These are the files that produce .js outputs, and are where you'd normally write your code.
+
+> .d.ts files are declaration files that contain only type information. These files don't produce .js outputs; they are only used for typechecking. We'll learn more about how to write our own declaration files later.
+
+https://microsoft.github.io/TypeScript-New-Handbook/chapters/type-declarations/#.d.ts-files
+
+`*.d.ts` files present in the projects folder are found and used automatically by typescript.
+
+The consensus seems to be NOT to write them yourself unless converting a JS library for typesafe use in typescript or converting a JS application to typescript without having to change all the code (?))
+
 ### Defining types using type aliases
 
 Type alias: different name for existing type, e.g. to add meaning to types or change the type later.
@@ -977,3 +989,64 @@ Decorators can be stacked:
 
 
 ## Working with modules
+
+Modules provide their own namespaces. `import` and `export` is now supported natively in all major browsers and doesn't need webpack anymore.
+
+### Defining global types with ambient modules
+
+Useful for adding types to existing JS codebases converting the js files.
+
+global.d.ts (name doesn't matter except for the `.d.ts` suffix):
+
+    declare global {
+      /** formats a date **/
+      function formatDate(date: Date): string
+    }
+    
+    export {} // sic!
+
+### Declaration merging
+
+Classes are regarded as interfaces by typescript.  To add properties to an existing class, we can write an interface with the same name as the class that are *merged* to the existing class. 
+
+Example 1: class
+
+    interface Customer {
+      /** saves the customer **/
+      save(): void
+    }
+    
+    class Customer {}
+    
+    const customer = new Customer();
+    customer.save = function() {}
+
+Example 2: adding members to the global `Window` object:
+
+global.d.ts
+
+    declare global {
+      interface Window {
+        MY_VAR: string
+      }
+    }
+
+    export {}
+
+Usage (in any js / ts file):
+
+    const myVar = window.MY_VAR
+
+### Executing modular code
+
+NodeJS doesn't support the import / export syntax. Add support by adding an entry to tsconfig.json:
+
+    {
+        "compilerOptions": {
+            // ...
+            "module": "CommonJS"
+        },
+        // ...
+    }
+
+For browsers, even though most browsers support it now, it is recommended to use a bundling tool such as `webpack` or `parcel`.
