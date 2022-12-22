@@ -1,3 +1,42 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**
+
+- [TypeScript Essential Training](#typescript-essential-training)
+  - [Introduction](#introduction)
+  - [Introducing typescript to your application](#introducing-typescript-to-your-application)
+    - [Installation](#installation)
+    - [Adding typescript to an existing solution](#adding-typescript-to-an-existing-solution)
+    - [Adding type checking to javascript files](#adding-type-checking-to-javascript-files)
+    - [Importing 3rd party types](#importing-3rd-party-types)
+  - [Basic usage](#basic-usage)
+    - [Primitives and built-in types](#primitives-and-built-in-types)
+    - [Creating custom types with interfaces](#creating-custom-types-with-interfaces)
+    - [Type definition files](#type-definition-files)
+    - [Defining types using type aliases](#defining-types-using-type-aliases)
+    - [Defining enumerable types](#defining-enumerable-types)
+    - [Typing functions](#typing-functions)
+    - [Defining metatypes using generics](#defining-metatypes-using-generics)
+  - [Defining more complex types](#defining-more-complex-types)
+    - [Combining multiple types with union types](#combining-multiple-types-with-union-types)
+    - [Keyof operator](#keyof-operator)
+    - [Typeof operator](#typeof-operator)
+    - [Indexed access types](#indexed-access-types)
+    - [Defining dynamic but limited types with records](#defining-dynamic-but-limited-types-with-records)
+  - [Extending and extracting metadata from existing types](#extending-and-extracting-metadata-from-existing-types)
+    - [Extending and modifying existing types](#extending-and-modifying-existing-types)
+    - [Extracting metadata from existing types / Map types](#extracting-metadata-from-existing-types--map-types)
+  - [Decorators](#decorators)
+    - [Method decorators](#method-decorators)
+    - [Class decorators](#class-decorators)
+    - [Creating a property decorator](#creating-a-property-decorator)
+  - [Working with modules](#working-with-modules)
+    - [Defining global types with ambient modules](#defining-global-types-with-ambient-modules)
+    - [Declaration merging](#declaration-merging)
+    - [Executing modular code](#executing-modular-code)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # TypeScript Essential Training
 
 Follow-along of the course of the same name by Jess Chadwick on linkedin learning
